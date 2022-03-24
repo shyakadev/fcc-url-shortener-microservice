@@ -40,7 +40,7 @@ const shortUrlDoesExist = (number) => {
 };
 
 const saveUrl = (string) =>
-  shortUrlsDb.push({ short_url: shortUrlsDb.length + 1, original_url: string });
+  shortUrlsDb.push({ original_url: string, short_url: shortUrlsDb.length + 1 });
 
 // Basic Configuration
 const port = process.env.PORT || 3000;
