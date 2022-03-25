@@ -3,10 +3,84 @@ const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const app = express();
+const fs = require("fs");
+const urlFilePath = "./urls.json";
 
 const urlencodedParser = bodyParser.urlencoded({ extended: false });
 
-let shortUrlsDb = [];
+const fileExist = (filePath) => {
+  const initialData = [
+    { original_url: "https://github.com/shyakadev", short_url: 1 },
+  ];
+  if (!fs.existsSync(filePath)) writeFile(filePath, initialData);
+};
+
+const readFile = (filePath) => {
+  fileExist(filePath);
+  try {
+    const urls = fs.readFileSync(filePath);
+    return JSON.parse(urls);
+  } catch (error) {
+    console.log(error);
+  }
+};
+
+const writeFile = (filePath, data) => {
+  fs.writeFile(filePath, JSON.stringify(data, null, 4), (err) => {
+    if (err) {
+      console.log(`Error writing file: ${err}`);
+    }
+    console.log("New record added!");
+  });
+};
+
+function getUrl(url) {
+  if (!isValidUrl(url)) return { error: "Invalid URL" };
+  addUrl(url);
+  return originalUrlExist(url);
+}
+
+const getUrls = () => readFile(urlFilePath);
+
+function addUrl(urlString) {
+  fileExist(urlFilePath);
+
+  const urlExist = originalUrlExist(urlString);
+  console.log("original url existance: " + urlExist);
+  if (!urlExist) {
+    const urlsArray = getUrls();
+    if (Array.isArray(urlsArray)) {
+      const urlObject = {
+        original_url: urlString,
+        short_url: urlsArray.length + 1,
+      };
+      urlsArray.push(urlObject);
+
+      console.log("existing: " + urlsArray);
+      writeFile(urlFilePath, urlsArray);
+    }
+  } else {
+    console.log("Provided url already exist");
+  }
+}
+
+const originalUrlExist = (string) => {
+  const urlsArray = getUrls();
+
+  if (Array.isArray(urlsArray)) {
+    const url = urlsArray.find(({ original_url }) => original_url === string);
+    return url;
+  }
+};
+
+const shortUrlExist = (string) => {
+  const shortned_url = Number(string);
+  const urlsArray = getUrls();
+  if (Array.isArray(urlsArray)) {
+    const url = urlsArray.find(({ short_url }) => short_url === shortned_url);
+    return url;
+  }
+};
 
 const isValidUrl = (string) => {
   let url;
@@ -16,31 +90,8 @@ const isValidUrl = (string) => {
     return false;
   }
 
-  return url.protocol === "http:" || url.protocol === "http:";
+  return url.protocol === "http:" || url.protocol === "https:";
 };
-
-const getUrls = (string) => {
-  let url;
-  if (isValidUrl(string)) {
-    !doesExist(string) ? saveUrl(string) : "";
-    url = doesExist(string);
-  } else {
-    url = { error: "Invalid URL" };
-  }
-
-  return url;
-};
-
-const doesExist = (string) =>
-  shortUrlsDb.find(({ original_url }) => original_url === string);
-
-const shortUrlDoesExist = (number) => {
-  const url = shortUrlsDb.find(({ short_url }) => short_url == number);
-  return url["original_url"];
-};
-
-const saveUrl = (string) =>
-  shortUrlsDb.push({ original_url: string, short_url: shortUrlsDb.length + 1 });
 
 // Basic Configuration
 const port = process.env.PORT || 3000;
@@ -59,13 +110,14 @@ app.get("/api/hello", function (req, res) {
 });
 
 app.post("/api/shorturl", urlencodedParser, function (req, res) {
-  res.json(getUrls(req.body.url)), console.log(shortUrlsDb);
+  res.json(getUrl(req.body.url));
 });
 
 app.get("/api/shorturl/:short_url", function (req, res) {
+  const short_url = req.params.short_url;
   try {
-    const url = shortUrlDoesExist(req.params.short_url);
-    res.redirect(url);
+    const url = shortUrlExist(short_url);
+    res.redirect(url["original_url"]);
   } catch (error) {
     res.json({ error: "No short URL found for the given input" });
   }
