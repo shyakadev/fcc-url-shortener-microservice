@@ -7,10 +7,5 @@
     ],
     "routes": [
       { "src": "/(.*)", "dest": "/server.js" }
-    ],
-    "functions": {
-      "api": {
-        "includeFiles": "./urls.json"
-      }
-    }
+    ]
   }
