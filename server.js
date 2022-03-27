@@ -36,8 +36,7 @@ const writeFile = (filePath, data) => {
 
 function getUrl(url) {
   if (!isValidUrl(url)) return { error: "Invalid URL" };
-  addUrl(url);
-  return originalUrlExist(url);
+  return addUrl(url);
 }
 
 const getUrls = () => readFile(urlFilePath);
@@ -45,8 +44,7 @@ const getUrls = () => readFile(urlFilePath);
 function addUrl(urlString) {
   fileExist(urlFilePath);
 
-  const urlExist = originalUrlExist(urlString);
-  console.log("original url existance: " + urlExist);
+  let urlExist = originalUrlExist(urlString);
   if (!urlExist) {
     const urlsArray = getUrls();
     if (Array.isArray(urlsArray)) {
@@ -56,11 +54,12 @@ function addUrl(urlString) {
       };
       urlsArray.push(urlObject);
 
-      console.log("existing: " + urlsArray);
       writeFile(urlFilePath, urlsArray);
+      return urlObject
     }
   } else {
     console.log("Provided url already exist");
+    return urlExist;
   }
 }
 
@@ -69,7 +68,7 @@ const originalUrlExist = (string) => {
 
   if (Array.isArray(urlsArray)) {
     const url = urlsArray.find(({ original_url }) => original_url === string);
-    return url;
+     return url;
   }
 };
 
@@ -110,7 +109,8 @@ app.get("/api/hello", function (req, res) {
 });
 
 app.post("/api/shorturl", urlencodedParser, function (req, res) {
-  res.json(getUrl(req.body.url));
+  const url = getUrl(req.body.url);
+  res.json(url);
 });
 
 app.get("/api/shorturl/:short_url", function (req, res) {
