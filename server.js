@@ -3,94 +3,43 @@ const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const app = express();
-const fs = require("fs");
-const urlFilePath = "./urls.json";
+const mongoose = require('mongoose')
+const mongo_uri = process.env.MONGO_URI;
+mongoose.connect(mongo_uri)
+const connection = mongoose.connection;
+connection.on('error', err => {
+  console.log("Connection Error: "+ err)
+})
+connection.once('open', () => console.log("Successfully connected to DB"))
+
+const urlSchema = new mongoose.Schema({
+  original_url: String,
+  short_url: String
+})
+const Url = mongoose.model('Url', urlSchema)
+const getOriginalUrl = async (url) => {
+  const findOne = await Url.findOne({original_url: url})
+  return findOne;
+}
+const getShortUrl = async (url) => await Url.findOne({short_url: url})
+const saveUrl = async (url) => {
+  let getUrl = await getOriginalUrl(url)
+
+  if(!getUrl){
+
+    const shortUrl = await Url.countDocuments({}).exec() + 1;
+    getUrl = new Url({
+      original_url: url,
+      short_url: shortUrl
+    });
+    await getUrl.save()
+    return {original_url: getUrl.original_url,short_url: getUrl.short_url};
+  } else {
+    return {original_url: getUrl.original_url, short_url: getUrl.short_url}
+  }
+}
 
 const urlencodedParser = bodyParser.urlencoded({ extended: false });
-
-const fileExist = (filePath) => {
-  const initialData = [
-    { original_url: "https://github.com/shyakadev", short_url: 1 },
-  ];
-  if (!fs.existsSync(filePath)) writeFile(filePath, initialData);
-};
-
-const readFile = (filePath) => {
-  fileExist(filePath);
-  try {
-    const urls = fs.readFileSync(filePath);
-    return JSON.parse(urls);
-  } catch (error) {
-    console.log(error);
-  }
-};
-
-const writeFile = (filePath, data) => {
-  fs.writeFile(filePath, JSON.stringify(data, null, 4), (err) => {
-    if (err) {
-      console.log(`Error writing file: ${err}`);
-    }
-    console.log("New record added!");
-  });
-};
-
-function getUrl(url) {
-  if (!isValidUrl(url)) return { error: "Invalid URL" };
-  return addUrl(url);
-}
-
-const getUrls = () => readFile(urlFilePath);
-
-function addUrl(urlString) {
-  fileExist(urlFilePath);
-
-  let urlExist = originalUrlExist(urlString);
-  if (!urlExist) {
-    const urlsArray = getUrls();
-    if (Array.isArray(urlsArray)) {
-      const urlObject = {
-        original_url: urlString,
-        short_url: urlsArray.length + 1,
-      };
-      urlsArray.push(urlObject);
-
-      writeFile(urlFilePath, urlsArray);
-      return urlObject
-    }
-  } else {
-    console.log("Provided url already exist");
-    return urlExist;
-  }
-}
-
-const originalUrlExist = (string) => {
-  const urlsArray = getUrls();
-
-  if (Array.isArray(urlsArray)) {
-    const url = urlsArray.find(({ original_url }) => original_url === string);
-     return url;
-  }
-};
-
-const shortUrlExist = (string) => {
-  const shortned_url = Number(string);
-  const urlsArray = getUrls();
-  if (Array.isArray(urlsArray)) {
-    const url = urlsArray.find(({ short_url }) => short_url === shortned_url);
-    return url;
-  }
-};
-
-const isValidUrl = (string) => {
-  let url;
-  try {
-    url = new URL(string);
-  } catch (e) {
-    return false;
-  }
-
-  return url.protocol === "http:" || url.protocol === "https:";
-};
 
 // Basic Configuration
 const port = process.env.PORT || 3000;
@@ -105,19 +54,18 @@ app.get("/", function (req, res) {
 
 // First API endpoint
 app.get("/api/hello", function (req, res) {
-  res.json(getUrls());
+  res.json({response: "Hello World"})
 });
 
-app.post("/api/shorturl", urlencodedParser, function (req, res) {
-  const url = getUrl(req.body.url);
+app.post("/api/shorturl", urlencodedParser, async function (req, res) {
+  const url = await saveUrl(req.body.url);
   res.json(url);
 });
 
-app.get("/api/shorturl/:short_url", function (req, res) {
-  const short_url = req.params.short_url;
+app.get("/api/shorturl/:short_url", async function (req, res) {
   try {
-    const url = shortUrlExist(short_url);
-    res.redirect(url["original_url"]);
+    const url = await getShortUrl(req.params.short_url);
+    res.redirect(url.original_url);
   } catch (error) {
     res.json({ error: "No short URL found for the given input" });
   }
