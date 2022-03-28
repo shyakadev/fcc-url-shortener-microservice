@@ -3,41 +3,49 @@ const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const app = express();
-const mongoose = require('mongoose')
+const mongoose = require("mongoose");
 const mongo_uri = process.env.MONGO_URI;
-mongoose.connect(mongo_uri)
+mongoose.connect(mongo_uri);
 const connection = mongoose.connection;
-connection.on('error', err => {
-  console.log("Connection Error: "+ err)
-})
-connection.once('open', () => console.log("Successfully connected to DB"))
+connection.on("error", (err) => {
+  console.log("Connection Error: " + err);
+});
+connection.once("open", () => console.log("Successfully connected to DB"));
 
 const urlSchema = new mongoose.Schema({
   original_url: String,
-  short_url: String
-})
-const Url = mongoose.model('Url', urlSchema)
+  short_url: String,
+});
+const Url = mongoose.model("Url", urlSchema);
 const getOriginalUrl = async (url) => {
-  const findOne = await Url.findOne({original_url: url})
+  const findOne = await Url.findOne({ original_url: url });
   return findOne;
-}
-const getShortUrl = async (url) => await Url.findOne({short_url: url})
+};
+const getShortUrl = async (url) => await Url.findOne({ short_url: url });
 const saveUrl = async (url) => {
-  let getUrl = await getOriginalUrl(url)
+  let getUrl = await getOriginalUrl(url);
 
-  if(!getUrl){
-
-    const shortUrl = await Url.countDocuments({}).exec() + 1;
+  if (!getUrl) {
+    const shortUrl = (await Url.countDocuments({}).exec()) + 1;
     getUrl = new Url({
       original_url: url,
-      short_url: shortUrl
+      short_url: shortUrl,
     });
-    await getUrl.save()
-    return {original_url: getUrl.original_url,short_url: getUrl.short_url};
+    await getUrl.save();
+    return { original_url: getUrl.original_url, short_url: getUrl.short_url };
   } else {
-    return {original_url: getUrl.original_url, short_url: getUrl.short_url}
+    return { original_url: getUrl.original_url, short_url: getUrl.short_url };
   }
-}
+};
+const isValidUrl = (string) => {
+  let url;
+  try {
+    url = new URL(string);
+  } catch (e) {
+    return false;
+  }
+  return url.protocol === "http:" || url.protocol === "https:";
+};
 
 const urlencodedParser = bodyParser.urlencoded({ extended: false });
 
@@ -54,11 +62,13 @@ app.get("/", function (req, res) {
 
 // First API endpoint
 app.get("/api/hello", function (req, res) {
-  res.json({response: "Hello World"})
+  res.json({ response: "Hello World" });
 });
 
 app.post("/api/shorturl", urlencodedParser, async function (req, res) {
-  const url = await saveUrl(req.body.url);
+  const url = isValidUrl(req.body.url)
+    ? await saveUrl(req.body.url)
+    : { error: "invalid url" };
   res.json(url);
 });
 
